@@ -100,7 +100,7 @@ public class HystrixCircuitBreakerTest {
         }
 
         @Override
-        public boolean attemptExecution() {
+        public boolean attemptExecution(final AbstractCommand cmd) {
             return !isOpen();
         }
 
@@ -348,11 +348,11 @@ public class HystrixCircuitBreakerTest {
             Thread.sleep(sleepWindow + 50);
 
             // we should now allow 1 request
-            assertTrue(cb.attemptExecution());
+            assertTrue(cb.attemptExecution(cmd1));
             // but the circuit should still be open
             assertTrue(cb.isOpen());
             // and further requests are still blocked
-            assertFalse(cb.attemptExecution());
+            assertFalse(cb.attemptExecution(cmd2));
 
         } catch (Exception e) {
             e.printStackTrace();
@@ -610,6 +610,55 @@ public class HystrixCircuitBreakerTest {
             assertTrue(cb.allowRequest());
             assertFalse(cb.isOpen());
 
+        } catch (Exception e) {
+            e.printStackTrace();
+            fail("Error occurred: " + e.getMessage());
+        }
+    }
+
+    @Test
+    public void testFurtherRequestDoseNotAffectCircuit() {
+        String key = "cmd-J";
+        try {
+            int sleepWindow = 200;
+
+            // fail
+            HystrixCommand<Boolean> cmd1 = new FailureCommand(key, 1, sleepWindow);
+            HystrixCommand<Boolean> cmd2 = new FailureCommand(key, 1, sleepWindow);
+            HystrixCommand<Boolean> cmd3 = new FailureCommand(key, 1, sleepWindow);
+            HystrixCommand<Boolean> cmd4 = new FailureCommand(key, 1, sleepWindow);
+            cmd1.execute();
+            cmd2.execute();
+            cmd3.execute();
+            cmd4.execute();
+
+            HystrixCircuitBreaker cb = cmd1.circuitBreaker;
+
+            // everything has failed in the test window so we should return false now
+            Thread.sleep(100);
+            assertFalse(cb.allowRequest());
+            assertTrue(cb.isOpen());
+
+            HystrixCommand<Boolean> cmd5 = new SuccessCommand(key, 300, sleepWindow);
+            HystrixCommand<Boolean> cmd6 = new FailureCommand(key, 1, sleepWindow);
+
+            // wait for sleep window to pass
+            Thread.sleep(sleepWindow + 50);
+
+            // allow 1 request, and upon success, should cause the circuit to be closed
+            Observable<Boolean> asyncResult5 = cmd5.observe();
+            // and further requests are still blocked while the first command is in flight
+            assertFalse(cb.allowRequest());
+            assertTrue(cb.isOpen());
+
+            cmd6.execute();
+            assertFalse(cb.allowRequest());
+            assertTrue(cb.isOpen());
+
+            asyncResult5.toBlocking().single();
+
+            assertTrue(cb.allowRequest());
+            assertFalse(cb.isOpen());
         } catch (Exception e) {
             e.printStackTrace();
             fail("Error occurred: " + e.getMessage());

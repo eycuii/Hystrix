@@ -64,6 +64,8 @@ import java.util.concurrent.atomic.AtomicReference;
     protected final HystrixThreadPoolKey threadPoolKey;
     protected final HystrixCommandProperties properties;
 
+    protected boolean isFirstAfterSleepWindow = false;
+
     protected enum TimedOutStatus {
         NOT_EXECUTED, COMPLETED, TIMED_OUT
     }
@@ -382,7 +384,9 @@ import java.util.concurrent.atomic.AtomicReference;
         final Action0 unsubscribeCommandCleanup = new Action0() {
             @Override
             public void call() {
-                circuitBreaker.markNonSuccess();
+                if (_cmd.isFirstAfterSleepWindow) {
+                    circuitBreaker.markNonSuccess();
+                }
                 if (_cmd.commandState.compareAndSet(CommandState.OBSERVABLE_CHAIN_CREATED, CommandState.UNSUBSCRIBED)) {
                     if (!_cmd.executionResult.containsTerminalEvent()) {
                         _cmd.eventNotifier.markEvent(HystrixEventType.CANCELLED, _cmd.commandKey);
@@ -521,7 +525,7 @@ import java.util.concurrent.atomic.AtomicReference;
         executionHook.onStart(_cmd);
 
         /* determine if we're allowed to execute */
-        if (circuitBreaker.attemptExecution()) {
+        if (circuitBreaker.attemptExecution(_cmd)) {
             final TryableSemaphore executionSemaphore = getExecutionSemaphore();
             final AtomicBoolean semaphoreHasBeenReleased = new AtomicBoolean(false);
             final Action0 singleSemaphoreRelease = new Action0() {

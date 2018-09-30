@@ -61,7 +61,7 @@ public interface HystrixCircuitBreaker {
      * Invoked at start of command execution to attempt an execution.  This is non-idempotent - it may modify internal
      * state.
      */
-    boolean attemptExecution();
+    boolean attemptExecution(final AbstractCommand cmd);
 
     /**
      * @ExcludeFromJavadoc
@@ -261,7 +261,7 @@ public interface HystrixCircuitBreaker {
         }
 
         @Override
-        public boolean attemptExecution() {
+        public boolean attemptExecution(final AbstractCommand cmd) {
             if (properties.circuitBreakerForceOpen().get()) {
                 return false;
             }
@@ -277,6 +277,7 @@ public interface HystrixCircuitBreaker {
                     //if the executing command fails, the status will transition to OPEN
                     //if the executing command gets unsubscribed, the status will transition to OPEN
                     if (status.compareAndSet(Status.OPEN, Status.HALF_OPEN)) {
+                        cmd.isFirstAfterSleepWindow = true;
                         return true;
                     } else {
                         return false;
@@ -316,7 +317,7 @@ public interface HystrixCircuitBreaker {
         }
 
         @Override
-        public boolean attemptExecution() {
+        public boolean attemptExecution(final AbstractCommand cmd) {
             return true;
         }
     }
