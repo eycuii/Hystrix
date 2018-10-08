@@ -617,7 +617,7 @@ public class HystrixCircuitBreakerTest {
     }
 
     @Test
-    public void testFurtherRequestDoseNotAffectCircuit() {
+    public void testFurtherRequestDoseNotAffectCircuitBreaker() {
         String key = "cmd-K";
         try {
             int sleepWindow = 200;
@@ -639,7 +639,7 @@ public class HystrixCircuitBreakerTest {
             assertFalse(cb.allowRequest());
             assertTrue(cb.isOpen());
 
-            HystrixCommand<Boolean> cmd5 = new SuccessCommand(key, 300, sleepWindow);
+            HystrixCommand<Boolean> cmd5 = new SuccessCommand(key, 1, sleepWindow);
             HystrixCommand<Boolean> cmd6 = new FailureCommand(key, 1, sleepWindow);
 
             // wait for sleep window to pass
