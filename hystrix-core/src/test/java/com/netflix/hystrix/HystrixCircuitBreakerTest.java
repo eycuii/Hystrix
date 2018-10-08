@@ -618,7 +618,7 @@ public class HystrixCircuitBreakerTest {
 
     @Test
     public void testFurtherRequestDoseNotAffectCircuit() {
-        String key = "cmd-J";
+        String key = "cmd-K";
         try {
             int sleepWindow = 200;
 
